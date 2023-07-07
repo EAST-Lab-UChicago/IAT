@@ -18,7 +18,7 @@ function initialize()
 			template = data;
 			$.get("core/instruct0.html", function(data) {
 				$("#instructions").html(data);
-				$("#subID").val(randomString(10));
+				$("#subID").val("");
 			});
 		});
 	});
