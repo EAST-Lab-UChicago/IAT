@@ -318,7 +318,7 @@ function instructionPage()
 		}
 		else
 		{
-		    resulttext = "<div style='text-align:center;padding:20px'>Thanks for participating!</div>";
+		    resulttext = "<div style='text-align:center;padding:20px'>Thanks for completing this portion of the study! Enter this completion code `42734732` in Qualtrics to continue the rest of the survey.</div>";
 		    $("#picture_frame").html(resulttext);
 		}
 	}
