@@ -13,7 +13,7 @@ function initialize()
 {	
 	// get active template & load data into global variable
 	$.getJSON("templates/active.txt", function(input) {
-		document.title = input.active + " IAT";
+		document.title = "IAT";
 		$.getJSON("templates/"+input.active+"/input.txt", function(data) { 
 			template = data;
 			$.get("core/instruct0.html", function(data) {
