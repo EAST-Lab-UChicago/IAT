@@ -31,7 +31,7 @@ function loadInstructions(stage)
 	{
 		case 'one':
 			sub = $("#subID").val();
-			if(sub.search('/[^a-zA-Z0-9]/g')==-1)
+			if(sub.length >= 8 && sub.length <= 32 && /^[a-zA-Z0-9]+$/.test(sub))
 			{
 				$.get("core/instruct1.html", function(data) {
 					$("#instructions").html(data);
