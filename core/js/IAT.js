@@ -47,7 +47,7 @@ function loadInstructions(stage)
 			}
 			else
 			{
-				alert("Please enter a valid subject ID");
+				alert("Please enter a valid Prolific ID");
 			}
 			break;
 		case 'two':
