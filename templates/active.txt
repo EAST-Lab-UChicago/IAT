@@ -1,1 +1,1 @@
-{"active":"Race-Creativity","available":["Empty","Race","Race-Creativity","Science","Gender","Gender-Happy"]}
+{"active":"Race(BW)_Attitude","available":["Empty","Race","Race-Creativity","Science","Gender","Gender-Happy", "Race(BW)_Attitude"]}
