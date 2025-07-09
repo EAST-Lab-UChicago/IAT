@@ -411,7 +411,7 @@ function calculateIAT()
   //       // resulttext += "<div>incompatible: "+incompatible+" ("+(ivar/39)+"); compatible: "+compatible+" ("+(cvar/39)+"); tvalue: "+tvalue+"</div>";
   //   }
 	// No IF statements on this study - just show the completion code
-	resulttext = "<div style='text-align:center;padding:20px'>Thanks for completing this portion of the study! Enter this completion code `` in Qualtrics to continue the rest of the survey.</div>";
+	resulttext = "<div style='text-align:center;padding:20px'>Thanks for completing this portion of the study! Enter this completion code "+completionCode+" in Qualtrics to continue the rest of the survey.</div>";
 	$("#picture_frame").html(resulttext);
 }
 
