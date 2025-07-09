@@ -50,7 +50,7 @@ function loadInstructions(stage)
 			}
 			else
 			{
-				alert("Please enter a valid Prolific ID");
+				alert("Please enter a valid Participant ID");
 			}
 			break;
 		case 'two':
