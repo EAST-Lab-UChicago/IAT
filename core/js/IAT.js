@@ -1,6 +1,9 @@
 template = {};
 sub = '';
 
+// This will be the completion code for this wave of the Race(BW)_Attitude study
+completionCode = '42734732';
+
 function randomString(length) {
 	var chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
     var result = '';
@@ -384,29 +387,31 @@ function calculateIAT()
 	else { severity = ""; }
 	
 	// put together feedback based on direction & magnitude
-	if (tvalue < 0 && severity != "")
-    { 
-        resulttext = "<div style='text-align:center;padding:20px'>You associate "+openA+template.catB.label+closeA+" with "+open1+template.cat1.label+close1;
-        resulttext += " and "+openA+template.catA.label+closeA+" with "+open1+template.cat2.label+close1+severity;
-        resulttext += "you associate "+openA+template.catA.label+closeA+" with "+open1+template.cat1.label+close1;
-        resulttext += " and "+openA+template.catB.label+closeA+" with "+open1+template.cat2.label+close1+".</div>"; 
-        // resulttext += "<div>incompatible: "+incompatible+" ("+(ivar/39)+"); compatible: "+compatible+" ("+(cvar/39)+"); tvalue: "+tvalue+"</div>";
-    }
-    else if (tvalue > 0 && severity != "")
-    { 
-        resulttext = "<div style='text-align:center;padding:20px'>You associate "+openA+template.catA.label+closeA+" with "+open1+template.cat1.label+close1;
-        resulttext += " and "+openA+template.catB.label+closeA+" with "+open1+template.cat2.label+close1+severity;
-        resulttext += "you associate "+openA+template.catB.label+closeA+" with "+open1+template.cat1.label+close1;
-        resulttext += " and "+openA+template.catA.label+closeA+" with "+open1+template.cat2.label+close1+".</div>"; 
-        // resulttext += "<div>incompatible: "+incompatible+" ("+(ivar/39)+"); compatible: "+compatible+" ("+(cvar/39)+"); tvalue: "+tvalue+"</div>";
-    }
-    else
-    { 
-        resulttext = "<div style='text-align:center;padding:20px'>You do not associate "+openA+template.catA.label+closeA;
-        resulttext += " with "+open1+template.cat1.label+close1+" any more or less than you associate ";
-        resulttext += openA+template.catB.label+closeA+" with "+open1+template.cat1.label+close1+".</div>"; 
-        // resulttext += "<div>incompatible: "+incompatible+" ("+(ivar/39)+"); compatible: "+compatible+" ("+(cvar/39)+"); tvalue: "+tvalue+"</div>";
-    }
+	// if (tvalue < 0 && severity != "")
+  //   { 
+  //       resulttext = "<div style='text-align:center;padding:20px'>You associate "+openA+template.catB.label+closeA+" with "+open1+template.cat1.label+close1;
+  //       resulttext += " and "+openA+template.catA.label+closeA+" with "+open1+template.cat2.label+close1+severity;
+  //       resulttext += "you associate "+openA+template.catA.label+closeA+" with "+open1+template.cat1.label+close1;
+  //       resulttext += " and "+openA+template.catB.label+closeA+" with "+open1+template.cat2.label+close1+".</div>"; 
+  //       // resulttext += "<div>incompatible: "+incompatible+" ("+(ivar/39)+"); compatible: "+compatible+" ("+(cvar/39)+"); tvalue: "+tvalue+"</div>";
+  //   }
+  //   else if (tvalue > 0 && severity != "")
+  //   { 
+  //       resulttext = "<div style='text-align:center;padding:20px'>You associate "+openA+template.catA.label+closeA+" with "+open1+template.cat1.label+close1;
+  //       resulttext += " and "+openA+template.catB.label+closeA+" with "+open1+template.cat2.label+close1+severity;
+  //       resulttext += "you associate "+openA+template.catB.label+closeA+" with "+open1+template.cat1.label+close1;
+  //       resulttext += " and "+openA+template.catA.label+closeA+" with "+open1+template.cat2.label+close1+".</div>"; 
+  //       // resulttext += "<div>incompatible: "+incompatible+" ("+(ivar/39)+"); compatible: "+compatible+" ("+(cvar/39)+"); tvalue: "+tvalue+"</div>";
+  //   }
+  //   else
+  //   { 
+  //       resulttext = "<div style='text-align:center;padding:20px'>You do not associate "+openA+template.catA.label+closeA;
+  //       resulttext += " with "+open1+template.cat1.label+close1+" any more or less than you associate ";
+  //       resulttext += openA+template.catB.label+closeA+" with "+open1+template.cat1.label+close1+".</div>"; 
+  //       // resulttext += "<div>incompatible: "+incompatible+" ("+(ivar/39)+"); compatible: "+compatible+" ("+(cvar/39)+"); tvalue: "+tvalue+"</div>";
+  //   }
+	// No IF statements on this study - just show the completion code
+	resulttext = "<div style='text-align:center;padding:20px'>Thanks for completing this portion of the study! Enter this completion code `` in Qualtrics to continue the rest of the survey.</div>";
 	$("#picture_frame").html(resulttext);
 }
 
