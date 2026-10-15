@@ -1,3 +1,8 @@
+<?php
+require_once(__DIR__ . '/core/auth.php');
+require_experimenter();
+header('X-Frame-Options: DENY');
+?>
 <!doctype html>
 <html>
 <head>

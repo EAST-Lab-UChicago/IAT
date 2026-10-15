@@ -7,3 +7,25 @@ Header set Pragma "no-cache"
 Header set Expires "Wed, 11 Jan 1984 05:00:00 GMT"
 </ifModule>
 </filesMatch>
+
+# Only mod_alias / mod_headers / mod_setenvif directives are used here so this
+# file works with "AllowOverride FileInfo" (no Options/AuthConfig needed).
+
+# Block participant results, server-side config, and deployment files
+<IfModule mod_alias.c>
+RedirectMatch 403 (?i)/templates/[^/]+/output(/|$)
+RedirectMatch 403 /core/(config|auth|common)\.php$
+RedirectMatch 403 /\.(git|gitignore|htaccess|DS_Store|Rhistory)(/|$)
+RedirectMatch 403 \.(sh|R|inc)$
+RedirectMatch 403 /(README|LICENSE\.TXT)$
+</IfModule>
+
+<IfModule mod_headers.c>
+Header always set X-Content-Type-Options "nosniff"
+Header always set Referrer-Policy "same-origin"
+</IfModule>
+
+# Pass the Authorization header to PHP under CGI/FastCGI (used by core/auth.php)
+<IfModule mod_setenvif.c>
+SetEnvIf Authorization "(.+)" HTTP_AUTHORIZATION=$1
+</IfModule>

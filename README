@@ -25,8 +25,7 @@ participants, the experimenter can direct their browser to the
 REQUIREMENTS:
 -------------
 
-Server-side: PHP (with permission to write files in directory)
-	     (optional) MySQL with root access
+Server-side: PHP 7.3+ (with permission to write files in directory)
 Client-side: Javascript-enabled web browser
 
 
@@ -36,6 +35,10 @@ USE:
 1) copy the folder to a publicly accessible folder on your web server
 
 2) from a shell prompt (i.e., Terminal in Mac or Linux, PuTTy in Windows) type 'sh setup.sh'
+   This sets permissions on the templates folder and creates the experimenter
+   login (username + password). The password file is stored outside the web
+   folder and its location is saved in core/config.php. Run it again to add
+   users or change a password.
 
 3) create a new version of the IAT using the experimenter tool (Direct your
    browser to [yourserver.com]/IAT/experimenter.php)
@@ -58,3 +61,18 @@ Category Label
 Category Index (which item within the category)
 Errors
 Reaction Time (in milliseconds)
+
+
+SECURITY NOTES:
+---------------
+
+- experimenter.php and core/fileManager.php require the experimenter login
+  (HTTP Basic Auth, checked in PHP by core/auth.php). Use HTTPS so the
+  password is not sent in clear text.
+- Participant results are written by core/saveResult.php.
+- The included .htaccess blocks web access to templates/*/output/ (participant
+  data), core/config.php and deployment files (.git, *.sh, *.R). It only uses
+  mod_alias/mod_headers/mod_setenvif, so it works with "AllowOverride FileInfo".
+- nginx and other servers ignore .htaccess. Add equivalent rules yourself, e.g.:
+      location ~* /templates/[^/]+/output(/|$) { deny all; }
+      location ~ /(\.git|.*\.sh$|.*\.R$|core/config\.php$) { deny all; }
