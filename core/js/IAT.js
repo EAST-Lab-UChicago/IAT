@@ -1,6 +1,13 @@
 template = {};
 sub = '';
 
+// Escape text from the template before inserting it into HTML
+function escapeHtml(str)
+{
+	return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+		.replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 function randomString(length) {
 	var chars = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
     var result = '';
@@ -35,7 +42,7 @@ function loadInstructions(stage)
 			{
 				$.get("core/instruct1.html", function(data) {
 					$("#instructions").html(data);
-					$(".IATname").html(template.name);
+					$(".IATname").text(template.name);
 					if(	template.catA.itemtype == "img" || 
 						template.catB.itemtype == "img" || 
 						template.cat1.itemtype == "img" || 
@@ -54,26 +61,26 @@ function loadInstructions(stage)
 			$.get("core/instruct2.html", function(data) {
 				$("#instructions").html(data);
 				
-				$("#clabel1").html(template.cat1.label);
-		        $("#clabel2").html(template.cat2.label);
-		        $("#clabelA").html(template.catA.label);
-		        $("#clabelB").html(template.catB.label);
+				$("#clabel1").text(template.cat1.label);
+		        $("#clabel2").text(template.cat2.label);
+		        $("#clabelA").text(template.catA.label);
+		        $("#clabelB").text(template.catB.label);
 		        if (template.cat1.itemtype == "txt")
-		            { $("#citems1").html(template.cat1.items.join(", ")); }
+		            { $("#citems1").text(template.cat1.items.join(", ")); }
 		        else if (template.cat1.itemtype == "img")
-		            { $("#citems1").html("Images of "+template.cat1.label); }
+		            { $("#citems1").text("Images of "+template.cat1.label); }
 		        if (template.cat2.itemtype == "txt")
-		            { $("#citems2").html(template.cat2.items.join(", ")); }
+		            { $("#citems2").text(template.cat2.items.join(", ")); }
 		        else if (template.cat2.itemtype == "img")
-		            { $("#citems2").html("Images of "+template.cat2.label); }
+		            { $("#citems2").text("Images of "+template.cat2.label); }
 		        if (template.catA.itemtype == "txt")
-		            { $("#citemsA").html(template.catA.items.join(", ")); }
+		            { $("#citemsA").text(template.catA.items.join(", ")); }
 		        else if (template.catA.itemtype == "img")
-		            { $("#citemsA").html("Images of "+template.catA.label); }
+		            { $("#citemsA").text("Images of "+template.catA.label); }
 		        if (template.catB.itemtype == "txt")
-		            { $("#citemsB").html(template.catB.items.join(", ")); }
+		            { $("#citemsB").text(template.catB.items.join(", ")); }
 		        else if (template.catB.itemtype == "img")
-		            { $("#citemsB").html("Images of "+template.catB.label); }
+		            { $("#citemsB").text("Images of "+template.catB.label); }
 			});
 			break;
 		case 'IAT':
@@ -123,36 +130,20 @@ function startIAT()
 // Adds all images to page (initially hidden) so they are pre-loaded for IAT
 function buildPage()
 {
-	if (template.catA.itemtype == "img")
+	var cats = [template.catA, template.catB, template.cat1, template.cat2];
+	for (var c = 0; c < cats.length; c++)
 	{
-		for (i in template.catA.items)
+		if (cats[c].itemtype == "img")
 		{
-			var itemstr = '<img id="'+template.catA.datalabel+i+'" class="IATitem" src="templates/'+template.name+'/img/'+template.catA.items[i]+'">';
-			$("#exp_instruct").after(itemstr);
-		}
-	}
-	if (template.catB.itemtype == "img")
-	{
-		for (i in template.catB.items)
-		{
-			var itemstr = '<img id="'+template.catB.datalabel+i+'" class="IATitem" src="templates/'+template.name+'/img/'+template.catB.items[i]+'">';
-			$("#exp_instruct").after(itemstr);
-		}
-	}
-	if (template.cat1.itemtype == "img")
-	{
-		for (i in template.cat1.items)
-		{
-			var itemstr = '<img id="'+template.cat1.datalabel+i+'" class="IATitem" src="templates/'+template.name+'/img/'+template.cat1.items[i]+'">';
-			$("#exp_instruct").after(itemstr);
-		}
-	}
-	if (template.cat2.itemtype == "img")
-	{
-		for (i in template.cat2.items)
-		{
-			var itemstr = '<img id="'+template.cat2.datalabel+i+'" class="IATitem" src="templates/'+template.name+'/img/'+template.cat2.items[i]+'">';
-			$("#exp_instruct").after(itemstr);
+			for (var i = 0; i < cats[c].items.length; i++)
+			{
+				var item = $('<img>', {
+					'id': cats[c].datalabel + i,
+					'class': 'IATitem',
+					'src': 'templates/' + encodeURIComponent(template.name) + '/img/' + encodeURIComponent(cats[c].items[i])
+				});
+				$("#exp_instruct").after(item);
+			}
 		}
 	}
 }
@@ -225,7 +216,7 @@ function initRounds()
 				// pick an item different from the last
 				do 
 					{ round.catIndex = Math.floor(Math.random()*template.catA.items.length); }
-	        	while (prevIndexA == round.catIndex)
+	        	while (template.catA.items.length > 1 && prevIndexA == round.catIndex)
 	        	prevIndexA = round.catIndex;
         		
         	}
@@ -237,7 +228,7 @@ function initRounds()
 				// pick an item different from the last
 				do
 	        	    { round.catIndex = Math.floor(Math.random()*template.catB.items.length); }
-	        	while (prevIndexA == round.catIndex)
+	        	while (template.catB.items.length > 1 && prevIndexA == round.catIndex)
 	        	prevIndexA = round.catIndex;
         	}
         	else if (round.category == template.cat1.datalabel)
@@ -247,7 +238,7 @@ function initRounds()
 				// pick an item different from the last
 				do
 	        	    { round.catIndex = Math.floor(Math.random()*template.cat1.items.length); }
-	        	while (prevIndex1 == round.catIndex)
+	        	while (template.cat1.items.length > 1 && prevIndex1 == round.catIndex)
 	        	prevIndex1 = round.catIndex;
         	}
         	else if (round.category == template.cat2.datalabel)
@@ -257,7 +248,7 @@ function initRounds()
 				// pick an item different from the last
 				do
 	        	    { round.catIndex = Math.floor(Math.random()*template.cat2.items.length); }
-	        	while (prevIndex1 == round.catIndex)
+	        	while (template.cat2.items.length > 1 && prevIndex1 == round.catIndex)
 	        	prevIndex1 = round.catIndex;
         	}	
         	
@@ -274,26 +265,26 @@ function instructionPage()
 	switch (session)
     {
 		case 0:
-			$('#left_cat').ready(function() { $('#left_cat').html(openA+template.catA.label+closeA); });
-			$('#right_cat').ready(function() { $('#right_cat').html(openA+template.catB.label+closeA); });
+			$('#left_cat').ready(function() { $('#left_cat').html(openA+escapeHtml(template.catA.label)+closeA); });
+			$('#right_cat').ready(function() { $('#right_cat').html(openA+escapeHtml(template.catB.label)+closeA); });
 			break;
         case 1:    
-			$("#left_cat").html(open1+template.cat1.label+close1);
-			$("#right_cat").html(open1+template.cat2.label+close1);
+			$("#left_cat").html(open1+escapeHtml(template.cat1.label)+close1);
+			$("#right_cat").html(open1+escapeHtml(template.cat2.label)+close1);
             break;
         case 2:
         case 3:
-			$("#left_cat").html(openA+template.catA.label+closeA+'<br>or<br>'+open1+template.cat1.label+close1);
-			$("#right_cat").html(openA+template.catB.label+closeA+'<br>or<br>'+open1+template.cat2.label+close1);
+			$("#left_cat").html(openA+escapeHtml(template.catA.label)+closeA+'<br>or<br>'+open1+escapeHtml(template.cat1.label)+close1);
+			$("#right_cat").html(openA+escapeHtml(template.catB.label)+closeA+'<br>or<br>'+open1+escapeHtml(template.cat2.label)+close1);
             break;
         case 4:
-			$("#left_cat").html(openA+template.catB.label+closeA);
-			$("#right_cat").html(openA+template.catA.label+closeA);
+			$("#left_cat").html(openA+escapeHtml(template.catB.label)+closeA);
+			$("#right_cat").html(openA+escapeHtml(template.catA.label)+closeA);
 			break;
         case 5:
         case 6:
-			$("#left_cat").html(openA+template.catB.label+closeA+'<br>or<br>'+open1+template.cat1.label+close1);
-			$("#right_cat").html(openA+template.catA.label+closeA+'<br>or<br>'+open1+template.cat2.label+close1);
+			$("#left_cat").html(openA+escapeHtml(template.catB.label)+closeA+'<br>or<br>'+open1+escapeHtml(template.cat1.label)+close1);
+			$("#right_cat").html(openA+escapeHtml(template.catA.label)+closeA+'<br>or<br>'+open1+escapeHtml(template.cat2.label)+close1);
             break;
     }
 	if (session == 7)
@@ -301,17 +292,7 @@ function instructionPage()
 		$("#left_cat").html("");
 		$("#right_cat").html("");
 		$("#exp_instruct").html("<img src='core/spinner.gif'>");
-		$.post("core/fileManager.php", { 'op':'checkdb', 'template':template.name }, 
- 			function(checkdb) {
-				if(checkdb == "success")
-				{
-				WriteDatabase();
-				}
-				else
-				{
-				WriteFile();
-				}
-			});	
+		WriteFile();
 		if(template.showResult == "show")
 		{
 		    calculateIAT();
@@ -386,163 +367,32 @@ function calculateIAT()
 	// put together feedback based on direction & magnitude
 	if (tvalue < 0 && severity != "")
     { 
-        resulttext = "<div style='text-align:center;padding:20px'>You associate "+openA+template.catB.label+closeA+" with "+open1+template.cat1.label+close1;
-        resulttext += " and "+openA+template.catA.label+closeA+" with "+open1+template.cat2.label+close1+severity;
-        resulttext += "you associate "+openA+template.catA.label+closeA+" with "+open1+template.cat1.label+close1;
-        resulttext += " and "+openA+template.catB.label+closeA+" with "+open1+template.cat2.label+close1+".</div>"; 
+        resulttext = "<div style='text-align:center;padding:20px'>You associate "+openA+escapeHtml(template.catB.label)+closeA+" with "+open1+escapeHtml(template.cat1.label)+close1;
+        resulttext += " and "+openA+escapeHtml(template.catA.label)+closeA+" with "+open1+escapeHtml(template.cat2.label)+close1+severity;
+        resulttext += "you associate "+openA+escapeHtml(template.catA.label)+closeA+" with "+open1+escapeHtml(template.cat1.label)+close1;
+        resulttext += " and "+openA+escapeHtml(template.catB.label)+closeA+" with "+open1+escapeHtml(template.cat2.label)+close1+".</div>"; 
         // resulttext += "<div>incompatible: "+incompatible+" ("+(ivar/39)+"); compatible: "+compatible+" ("+(cvar/39)+"); tvalue: "+tvalue+"</div>";
     }
     else if (tvalue > 0 && severity != "")
     { 
-        resulttext = "<div style='text-align:center;padding:20px'>You associate "+openA+template.catA.label+closeA+" with "+open1+template.cat1.label+close1;
-        resulttext += " and "+openA+template.catB.label+closeA+" with "+open1+template.cat2.label+close1+severity;
-        resulttext += "you associate "+openA+template.catB.label+closeA+" with "+open1+template.cat1.label+close1;
-        resulttext += " and "+openA+template.catA.label+closeA+" with "+open1+template.cat2.label+close1+".</div>"; 
+        resulttext = "<div style='text-align:center;padding:20px'>You associate "+openA+escapeHtml(template.catA.label)+closeA+" with "+open1+escapeHtml(template.cat1.label)+close1;
+        resulttext += " and "+openA+escapeHtml(template.catB.label)+closeA+" with "+open1+escapeHtml(template.cat2.label)+close1+severity;
+        resulttext += "you associate "+openA+escapeHtml(template.catB.label)+closeA+" with "+open1+escapeHtml(template.cat1.label)+close1;
+        resulttext += " and "+openA+escapeHtml(template.catA.label)+closeA+" with "+open1+escapeHtml(template.cat2.label)+close1+".</div>"; 
         // resulttext += "<div>incompatible: "+incompatible+" ("+(ivar/39)+"); compatible: "+compatible+" ("+(cvar/39)+"); tvalue: "+tvalue+"</div>";
     }
     else
     { 
-        resulttext = "<div style='text-align:center;padding:20px'>You do not associate "+openA+template.catA.label+closeA;
-        resulttext += " with "+open1+template.cat1.label+close1+" any more or less than you associate ";
-        resulttext += openA+template.catB.label+closeA+" with "+open1+template.cat1.label+close1+".</div>"; 
+        resulttext = "<div style='text-align:center;padding:20px'>You do not associate "+openA+escapeHtml(template.catA.label)+closeA;
+        resulttext += " with "+open1+escapeHtml(template.cat1.label)+close1+" any more or less than you associate ";
+        resulttext += openA+escapeHtml(template.catB.label)+closeA+" with "+open1+escapeHtml(template.cat1.label)+close1+".</div>"; 
         // resulttext += "<div>incompatible: "+incompatible+" ("+(ivar/39)+"); compatible: "+compatible+" ("+(cvar/39)+"); tvalue: "+tvalue+"</div>";
     }
 	$("#picture_frame").html(resulttext);
 }
 
-// not currently used
-function groupEvaluations()
-{
-	$('#demoglist').after(
-		"Please rate how warm or cold you feel toward the following groups:\
-		<br>\
-		(0 = coldest feelings, 5 = neutral, 10 = warmest feelings)\
-		<ol>\
-		<li>\
-		<p>"+template.catA.label+"</p>\
-		<p>\
-		<select id='catAwarm' name='catAwarm'> \
-		<option value='unselected' selected='selected'></option>\
-		<option value='0 coldest feelings'></option>\
-		<option value='1'></option>\
-		<option value='2'></option>\
-		<option value='3'></option>\
-		<option value='4'></option>\
-		<option value='5 neutral'></option>\
-		<option value='6'></option>\
-		<option value='7'></option>\
-		<option value='8'></option>\
-		<option value='9'></option>\
-		<option value='10 warmest feelings'></option>\
-		</select>\
-		</p> \
-		</li>\
-		<li>\
-		<p>"+template.catB.label+"</p>\
-		<p>\
-		<select id='catBwarm' name='catBwarm'> \
-		<option value='unselected' selected='selected'></option>\
-		<option value='0 coldest feelings'></option>\
-		<option value='1'></option>\
-		<option value='2'></option>\
-		<option value='3'></option>\
-		<option value='4'></option>\
-		<option value='5 neutral'></option>\
-		<option value='6'></option>\
-		<option value='7'></option>\
-		<option value='8'></option>\
-		<option value='9'></option>\
-		<option value='10 warmest feelings'></option>\
-		</select>\
-		</p> \
-		</li>\
-		</ol>\
-		");
-}
-
-function IsNumeric(input)
-{
-   return (input - 0) == input && input.length > 0;
-}
-
-// not currently used
-function checkDemographics()
-{
-    gender = $("input[name=gender]:checked").val();
-    age = $("#age option:selected").val();
-    loc = $("#loc option:selected").val().replace(/[^A-Za-z0-9,]/g,' ');
-    races = [];
-	$("input[name=race]:checked").each(function() { races.push($(this).val()); });
-    income = $("#income").val();
-    education = $("#edu option:selected").val();
-    
-    // alert(income+"\n"+parseFloat(income)+"\n");
-    // $.get('getLocation.php', 
-    //         { 'q': loc},
-    //         function(data) {
-    //             alert(data);
-    //         });
-    
-	// Do validation of input
-    var error = false;
-    var errmsg = "";
-    
-    if(gender==null)
-    {
-        error=true;
-        errmsg += "<div class='error'>Please choose an option for gender</div>";
-    }    
-	if(age=="unselected")
-    {
-        error=true;
-        errmsg += "<div class='error'>Please state the year you were born</div>";
-    }
-	if(loc.length == 0)
-    {
-        error=true;
-        errmsg += "<div class='error'>Please indicate your current location</div>";
-    }
-    if(races==null)
-    {
-        error=true;
-        errmsg += "<div class='error'>Please indicate your ethnicity</div>";
-    }
-    if(income==null || $.trim(income) != income.replace(/[^0-9$.,]/g,'') || !IsNumeric(income.replace(/[^0-9.]/g,'')))
-    {
-        error=true;
-        errmsg += "<div class='error'>Please enter a valid number for income</div>";
-    }
-    if(education=="unselected")
-    {
-        error=true;
-        errmsg += "<div class='error'>Please indicate your highest level of education</div>";
-    }
-	if(sub.length == 0)
-    {
-        error=true;
-        errmsg += "<div class='error'>Please enter a valid identifier</div>";
-    }
-	// Output error message if input not valid
-    if(error==false)
-    {
-		subject = sub;
-        var demos = gender+'\t';
-        demos += age+'\t';
-        demos += loc+'\t';
-        demos += races.join(',')+'\t';
-        demos += income.replace(/[^0-9.]/g,'')+'\t';
-        demos += education+'\n';
-	    $.post("core/writeFile.php", { 'subject': subject, 'src': "survey", 'data': demos }, function() {location.href = 'instruct2.php?sub='+sub;});
-    }
-    else
-    {
-        $('#error-1').html(errmsg);
-    }
-}
-
-
 // Converts the data for each session and round into a comma-delimited string
-// and passes it to writeFile.php to be written by the server
+// and passes it to saveResult.php to be written by the server
 function WriteFile()
 {
 	
@@ -568,43 +418,11 @@ function WriteFile()
 	}
 	
 	
-    $.post("core/fileManager.php", { 'op':'writeoutput', 'template':template.name, 
+    $.post("core/saveResult.php", { 'template':template.name, 
  			'subject': subject, 'data': str });	
  	
 	// notify user of success?
 }
-function WriteDatabase()
-{
-	
-	var subject = sub;
-	subject = subject.length==0 ? "unknown" : subject;
-	var str = "";
-	for (i=0; i<roundArray.length; i++)
-	{
-		for (j=0;j<roundArray[i].length;j++)
-		{
-			str += i + "," + j + ",";
-	        str += roundArray[i][j].category+",";
-			str += roundArray[i][j].catIndex+",";
-			str += roundArray[i][j].errors+",";
-			str += (roundArray[i][j].endtime - roundArray[i][j].starttime)+"\n";
-			var catIndex=roundArray[i][j].catIndex;
-			var category=roundArray[i][j].category;
-			var datai=i;
-			var dataj=j;
-			var mseconds=(roundArray[i][j].endtime - roundArray[i][j].starttime);
-			//$.post("core/fileManager.php", { 'op':'writedatabase', 'template':template.name, 
- 			//'subject': subject, 'data': str,'catindex':catIndex, 'category':category, 'datai':datai });
-			$.post("core/fileManager.php", { 'op':'writedatabase', 'template':template.name, 
- 			'subject': subject, 'data': str, 'datai':i, 'dataj':j,'category':roundArray[i][j].category, 'catindex':roundArray[i][j].catIndex,
- 			'errors':roundArray[i][j].errors, 'mseconds':(roundArray[i][j].endtime - roundArray[i][j].starttime) });
-		}
-	}
-	
- 	
-	// notify user of success?
-}
-
 
 
 // This monitors for keyboard events
@@ -648,22 +466,22 @@ function displayItem()
 	{
 		if (tRound.category == template.catA.datalabel)
 		{ 
-			$("#word").html(openA+template.catA.items[tRound.catIndex]+closeA)
+			$("#word").html(openA+escapeHtml(template.catA.items[tRound.catIndex])+closeA)
 			$("#word").css("display","block"); 
 		}
 		else if (tRound.category == template.catB.datalabel)
 		{ 
-			$("#word").html(openA+template.catB.items[tRound.catIndex]+closeA)
+			$("#word").html(openA+escapeHtml(template.catB.items[tRound.catIndex])+closeA)
 			$("#word").css("display","block"); 
 		}
 		else if (tRound.category == template.cat1.datalabel)
 		{ 
-			$("#word").html(open1+template.cat1.items[tRound.catIndex]+close1)
+			$("#word").html(open1+escapeHtml(template.cat1.items[tRound.catIndex])+close1)
 			$("#word").css("display","block"); 
 		}
 		else if (tRound.category == template.cat2.datalabel)
 		{ 
-			$("#word").html(open1+template.cat2.items[tRound.catIndex]+close1)
+			$("#word").html(open1+escapeHtml(template.cat2.items[tRound.catIndex])+close1)
 			$("#word").css("display","block"); 
 		}
 	}

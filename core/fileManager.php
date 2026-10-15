@@ -1,5 +1,18 @@
 <?php
-$base_dir = realpath(dirname(__FILE__));
+require_once(__DIR__ . '/common.php');
+require_once(__DIR__ . '/auth.php');
+
+send_text_headers();
+header('X-Frame-Options: DENY');
+require_experimenter();
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST')
+{
+	http_response_code(405);
+	echo "Error -2: POST required";
+	exit;
+}
+require_same_origin();
 
 $newTemplate = array(
 	"name" => "",
@@ -31,14 +44,41 @@ $newTemplate = array(
 	)
 );
 
+// Maximum item index accepted per category
+define('MAX_ITEMS', 500);
 
+function active_file()
+{
+	return IAT_TEMPLATE_DIR . '/active.txt';
+}
+
+function read_active()
+{
+	$active = json_decode(@file_get_contents(active_file()));
+	if (!is_object($active))
+	{
+		$active = new stdClass();
+		$active->active = 'Empty';
+	}
+	return $active;
+}
 
 //update active and available templates
 function updateActive($optArr=NULL)
 {
-	$active_str = file_get_contents('../templates/active.txt');
-	$active = json_decode($active_str);
-	
+	$fh = fopen(active_file(), 'c+');
+	if ($fh === false)
+	{
+		return false;
+	}
+	flock($fh, LOCK_EX);
+	$active = json_decode(stream_get_contents($fh));
+	if (!is_object($active))
+	{
+		$active = new stdClass();
+		$active->active = 'Empty';
+	}
+
 	// When "op" = "setActive", calls updateActive with 'newActive' option set
 	if(isset($optArr) && isset($optArr['newActive']))
 	{
@@ -58,66 +98,89 @@ function updateActive($optArr=NULL)
 			$active->active = 'Empty';
 		}
 	}
-	
+
 	$available = array();
-	if ($handle = opendir('../templates/')) 
+	if ($handle = opendir(IAT_TEMPLATE_DIR))
 	{
-	    $blacklist = array('.', '..', 'active.txt');
 	    while (false !== ($file = readdir($handle))) {
-	        if (!in_array($file, $blacklist)) {
+	        if (template_path($file) !== false) {
 	            array_push($available,$file);
 	        }
 	    }
 	    closedir($handle);
 	}
 	natcasesort($available);
-	$active->available = $available;
-	
-	$active_fh = fopen("../templates/active.txt", 'w');
-	fwrite($active_fh, json_encode($active));
-	fclose($active_fh);
-	
+	$active->available = array_values($available);
+
+	ftruncate($fh, 0);
+	rewind($fh);
+	fwrite($fh, json_encode($active));
+	fflush($fh);
+	flock($fh, LOCK_UN);
+	fclose($fh);
+	return true;
 }
 
-
-// check ending of files listed
-function endsWith($haystack, $needle)
+// Returns $form[$key] if it is a string, otherwise null
+function form_str($form, $key)
 {
-    $start = strlen($needle) * -1;
-    return (substr($haystack, $start) === $needle);
+	return (isset($form[$key]) && is_string($form[$key])) ? $form[$key] : null;
 }
 
-// pull all output files
-function getstats($completed)
+function error_item($html)
 {
-	foreach ($completed as $fname)
+	return "<li class='error-item'>" . $html . "</li>";
+}
+
+function h($str)
+{
+	return htmlspecialchars((string)$str, ENT_QUOTES, 'UTF-8');
+}
+
+// Recursively deletes a template directory (only one level of subfolders)
+function delete_template_dir($folder_dir)
+{
+	foreach (array('img', 'output') as $sub)
 	{
-		if(endsWith($fname, ".txt"))
+		$subdir = $folder_dir . '/' . $sub;
+		if (is_dir($subdir) && !is_link($subdir))
 		{
-			
+			foreach (scandir($subdir) as $item) {
+			    if ($item == '.' || $item == '..') continue;
+			    $path = $subdir . '/' . $item;
+			    if (is_file($path) || is_link($path)) unlink($path);
+			}
+			rmdir($subdir);
 		}
 	}
+	if (is_file($folder_dir . '/input.txt'))
+	{
+		unlink($folder_dir . '/input.txt');
+	}
+	return @rmdir($folder_dir);
 }
-
 
 
 // High level interface: process command sent from javascript
-if( isset($_REQUEST['op']) )
+$op = isset($_POST['op']) && is_string($_POST['op']) ? $_POST['op'] : null;
+if( $op !== null )
 {
-	switch($_REQUEST['op'])
+	switch($op)
 	{
 		case 'exists':
-			if( isset($_REQUEST['template']) )
-			{		
-				if( isset($_REQUEST['files']) )
+			if( isset($_POST['template']) && is_string($_POST['template']) )
+			{
+				if( isset($_POST['files']) && is_array($_POST['files']) )
 				{
+					$template = $_POST['template'];
+					$template_dir = template_path($template);
 					$newfiles = array();
-					foreach ( $_REQUEST['files'] as $file )
+					foreach ( $_POST['files'] as $file )
 					{
-						$fullpath = "templates/".$_REQUEST['template']."/img/".$file;
-						if (file_exists("../".$fullpath))
+						if ($template_dir !== false && valid_image_name($file) &&
+							is_file($template_dir . "/img/" . $file))
 						{
-							array_push($newfiles, $fullpath);
+							array_push($newfiles, "templates/" . $template . "/img/" . $file);
 						}
 						else
 						{
@@ -137,11 +200,19 @@ if( isset($_REQUEST['op']) )
 			}
 			break;
 		case 'setActive':
-			if( isset($_REQUEST['template']) )
+			if( isset($_POST['template']) && is_string($_POST['template']) )
 			{
-				$optArr = array('newActive' => $_REQUEST['template']);		
-				updateActive($optArr);
-				echo "success";
+				$template_dir = template_path($_POST['template']);
+				if ($template_dir === false || !is_file($template_dir . '/input.txt'))
+				{
+					echo "Error 3.1: template does not exist";
+				}
+				else
+				{
+					$optArr = array('newActive' => $_POST['template']);
+					updateActive($optArr);
+					echo "success";
+				}
 			}
 			else
 			{
@@ -149,65 +220,68 @@ if( isset($_REQUEST['op']) )
 			}
 			break;
 		case 'saveTemplate':
-			if( isset($_REQUEST['template']) )
-			{		
-				if( isset($_REQUEST['oldname']) && isset($_REQUEST['form']) )
+			if( isset($_POST['template']) )
+			{
+				if( isset($_POST['oldname']) && is_string($_POST['oldname']) &&
+					isset($_POST['form']) && is_string($_POST['form']) )
 				{
+					$oldname = $_POST['oldname'];
+					$old_dir = template_path($oldname);
 					$newform = $newTemplate;
 					$form = array();
 					parse_str($_POST['form'], $form);
 				 	if (!is_array($form) || count($form) == 0) {
-				        // something went wrong, initialize to empty array
-				        echo "Error 2.2: form data not properly formatted: \n" . $_REQUEST['form'];
+				        echo "Error 2.2: form data not properly formatted";
 				    }
+					else if ($old_dir === false)
+					{
+						echo "Error 2.3: template does not exist";
+					}
 					else {
 						$errors = "";
-						// template name is set and is < 30 characters
-						if(!isset($form["template-name"]) ||
-							strlen($form["template-name"]) > 30 /*|| 
-							$form["template-name"] != preg_replace('/[^\p{L}\p{N}]+/','',$form["template-name"])*/)
+						$template_name = form_str($form, "template-name");
+						$name_ok = false;
+						// template name is set, is < 30 characters, and is safe to use as a folder name
+						if(!valid_template_name($template_name))
 						{
-							$errors .= "<li class='error-item'>";
-							$errors .= "Please input a valid template name (less than 30 characters)";
-							$errors .= "</li>";
+							$errors .= error_item("Please input a valid template name (less than 30 characters)");
 						}
 						else
 						{
-							if ($form["template-name"] == "Empty")
+							if ($template_name == "Empty")
 							{
-								$errors .= "<li class='error-item'>";
-								$errors .= "<div style='color:red'>'Empty' is a reserved Template name</div>";
-								$errors .= " </li>";
+								$errors .= error_item("<div style='color:red'>'Empty' is a reserved Template name</div>");
 							}
 							// if new name != old name, and new name already taken, return error
-							if ($_REQUEST['oldname'] != $form["template-name"] && file_exists("../templates/".$form["template-name"]."/input.txt"))
+							if ($oldname != $template_name && file_exists(IAT_TEMPLATE_DIR."/".$template_name))
 							{
-								$errors .= "<li class='error-item'>";
-								$errors .= "<div style='color:red'>Template name " . $form["template-name"] . " is taken.</div>";
-								$errors .= " </li>";
+								$errors .= error_item("<div style='color:red'>Template name " . h($template_name) . " is taken.</div>");
 							}
 							else
 							{
-								$newform["name"] = $form["template-name"];
+								$newform["name"] = $template_name;
+								$name_ok = true;
 							}
 						}
 						// IAT type
-						if(!isset($form["IAT-type"]))
+						$iat_type = form_str($form, "IAT-type");
+						if($iat_type === null)
 						{
-							echo "Error 2.4: IAT type not set";
+							$errors .= error_item("IAT type not set");
 						}
-						else
+						else if (in_array($iat_type, array("one", "two"), true))
 						{
-							$newform["IATtype"] = $form["IAT-type"];
+							$newform["IATtype"] = $iat_type;
 						}
 						// show result
-						if(!isset($form["show-results"]))
+						$show_results = form_str($form, "show-results");
+						if($show_results === null)
 						{
-							echo "Error 2.5: Show results not set";
+							$errors .= error_item("Show results not set");
 						}
-						else
+						else if (in_array($show_results, array("show", "noshow"), true))
 						{
-							$newform["showResult"] = $form["show-results"];
+							$newform["showResult"] = $show_results;
 						}
 						// for each category
 						$newfiles = array();
@@ -215,169 +289,163 @@ if( isset($_REQUEST['op']) )
 						for ($i=1;$i<=4;$i++)
 						{
 							$newfiles["tabs".$i] = array();
+							$cat = "cat".$catnames[$i-1];
 							// if category is visible
-							if($form["tabs".$i."-shown"]=="true")
+							if(form_str($form, "tabs".$i."-shown") == "true")
 							{
 								// category name
-								if(!isset($form["tabs".$i."-catlabel-input"]) ||
-									strlen($form["tabs".$i."-catlabel-input"]) > 30 || 
-									$form["tabs".$i."-catlabel-input"] != preg_replace('/[^\p{L}\p{N}\-\(\)\$\#\@\? ]+/u', '', $form["tabs".$i."-catlabel-input"]))
+								$catlabel = form_str($form, "tabs".$i."-catlabel-input");
+								if($catlabel === null ||
+									strlen($catlabel) > 30 ||
+									$catlabel != preg_replace('/[^\p{L}\p{N}\-\(\)\$\#\@\? ]+/u', '', $catlabel))
 								{
-									$errors .= "<li class='error-item'>";
-									$errors .= "Please input a valid category label for Category " . $catnames[$i-1];
-									$errors .= " </li>";
+									$errors .= error_item("Please input a valid category label for Category " . $catnames[$i-1]);
 								}
 								else
 								{
 									// add category label0
-									$newform["cat".$catnames[$i-1]]["label"] = $form["tabs".$i."-catlabel-input"];
+									$newform[$cat]["label"] = $catlabel;
 								}
 								// data label
-								if(!isset($form["tabs".$i."-datalabel-input"]) ||
-									strlen($form["tabs".$i."-datalabel-input"]) > 3 || 
-									$form["tabs".$i."-datalabel-input"] != preg_replace('/[^\p{L}\p{N}]+/u','',$form["tabs".$i."-datalabel-input"]))
+								$datalabel = form_str($form, "tabs".$i."-datalabel-input");
+								if($datalabel === null ||
+									strlen($datalabel) > 3 ||
+									$datalabel != preg_replace('/[^\p{L}\p{N}]+/u','',$datalabel))
 								{
-									$errors .= "<li class='error-item'>";
-									$errors .= "Please input a valid data label for Category " . $catnames[$i-1] . " (less than 3 alphanumeric characters)";
-									$errors .= " </li>";
+									$errors .= error_item("Please input a valid data label for Category " . $catnames[$i-1] . " (less than 3 alphanumeric characters)");
 								}
 								else
 								{
 									// add data label
-									$newform["cat".$catnames[$i-1]]["datalabel"] = $form["tabs".$i."-datalabel-input"];
+									$newform[$cat]["datalabel"] = $datalabel;
 								}
 								// text or images
 								if(!isset($form["tabs".$i."-txt"]) && !isset($form["tabs".$i."-img"]))
 								{
-									echo "Error 2.6: Text or images not set for category " . $catnames[$i-1];
+									$errors .= error_item("Text or images not set for category " . $catnames[$i-1]);
 								}
 								else
 								{
 									if(isset($form["tabs".$i."-txt"]))
 									{
-										$newform["cat".$catnames[$i-1]]["itemtype"] = "txt";
+										$newform[$cat]["itemtype"] = "txt";
 										$txtorimg = "txt";
 									}
 									else
 									{
-										$newform["cat".$catnames[$i-1]]["itemtype"] = "img";
+										$newform[$cat]["itemtype"] = "img";
 										$txtorimg = "img";
 									}
 									// get max id number for items
-									if(!isset($form["max-cat".$catnames[$i-1]]))
+									$max_item = form_str($form, "max-".$cat);
+									if($max_item === null || !preg_match('/^[0-9]+$/', $max_item))
 									{
-										echo "Error 2.7: Maximum item number not set for category " . $catnames[$i-1];
+										$errors .= error_item("Maximum item number not set for category " . $catnames[$i-1]);
 									}
 									else
-									{	
+									{
+										$max_item = min((int)$max_item, MAX_ITEMS);
 										// for each item
-										for ($j=0; $j<=$form["max-cat".$catnames[$i-1]]; $j++)
+										for ($j=0; $j<=$max_item; $j++)
 										{
+											// some values of $j might not exist if items deleted
+											if(!array_key_exists($cat.$j."-txt", $form))
+											{
+												continue;
+											}
+											$item = form_str($form, $cat.$j."-txt");
+											if ($item === null)
+											{
+												$item = "";
+											}
 											// if text
 											if($txtorimg == "txt")
 											{
-												// some values of $j might not exist if items deleted
-												if(array_key_exists("cat".$catnames[$i-1].$j."-txt", $form))
+												// check if has ".jpg", etc.
+												if( preg_match("/\.[\p{L}]{2,4}/u",$item))
 												{
-													// check if has ".jpg", etc.
-													if( preg_match("/\.[\p{L}]{2,4}/u",$form["cat".$catnames[$i-1].$j."-txt"]))
-													{
-														$errors .= "<li class='error-item'>";
-														$errors .= "The text input, '" . $form["cat".$catnames[$i-1].$j."-txt"];
-														$errors .= "' in Category " . $catnames[$i-1] . " appears to be a file name.";
-														$errors .= " </li>";
-													}
-													else if ( preg_match("/[^\p{L}\p{N}\-\(\)\$\#\@\? ]+/u", $form["cat".$catnames[$i-1].$j."-txt"]))
-													{
-														$errors .= "<li class='error-item'>";
-														$errors .= "The text input, '" . $form["cat".$catnames[$i-1].$j."-txt"];
-														$errors .= "' in Category " . $catnames[$i-1] . " is not valid.";
-														$errors .= " </li>";
-													}
-													else
-													{
-														array_push($newform["cat".$catnames[$i-1]]["items"], $form["cat".$catnames[$i-1].$j."-txt"]);
-														
-													}
+													$errors .= error_item("The text input, '" . h($item) . "' in Category " . $catnames[$i-1] . " appears to be a file name.");
+												}
+												else if ( preg_match("/[^\p{L}\p{N}\-\(\)\$\#\@\? ]+/u", $item))
+												{
+													$errors .= error_item("The text input, '" . h($item) . "' in Category " . $catnames[$i-1] . " is not valid.");
+												}
+												else
+												{
+													array_push($newform[$cat]["items"], $item);
 												}
 											}
 											// if images
 											else
-											{	
-												// some values of $j might not exist if items deleted
-												if(array_key_exists("cat".$catnames[$i-1].$j."-txt", $form))
+											{
+												// verify image name is safe and the image exists
+												$imgfile = "templates/" . $oldname . "/img/" . $item;
+												if( !valid_image_name($item) ||
+													($oldname != "Empty" && !is_file($old_dir . "/img/" . $item)))
 												{
-													// verify image exists
-													$imgfile = "templates/" . $_REQUEST['oldname'] . "/img/" . $form["cat".$catnames[$i-1].$j."-txt"];
-													if( $_REQUEST['oldname'] != "Empty" && !file_exists("../".$imgfile))
-													{
-														$errors .= "<li class='error-item'>";
-														$errors .= $form["cat".$catnames[$i-1].$j."-txt"];
-														$errors .= " in Category ".$catnames[$i-1]." is not a valid file name.";
-														$errors .= "</li>";
-														array_push($newfiles["tabs".$i], "core/no-image.jpg");
-													}
-													else
-													{
-														array_push($newfiles["tabs".$i], $imgfile);
-														array_push($newform["cat".$catnames[$i-1]]["items"], $form["cat".$catnames[$i-1].$j."-txt"]);
-													}
+													$errors .= error_item(h($item) . " in Category ".$catnames[$i-1]." is not a valid file name.");
+													array_push($newfiles["tabs".$i], "core/no-image.jpg");
+												}
+												else
+												{
+													array_push($newfiles["tabs".$i], $imgfile);
+													array_push($newform[$cat]["items"], $item);
 												}
 											}
-										}	
+										}
 									}
 								}
-
 							}
 						}
-						
+
 						// if no errors
-						if(strlen($errors) == 0)
+						if(strlen($errors) == 0 && $name_ok)
 						{
 							// encode object as JSON string
 							$json_template = json_encode($newform);
-							
+							$new_dir = IAT_TEMPLATE_DIR . "/" . $template_name;
+
 							// if new template
-							if ($_REQUEST['oldname'] == "Empty")
+							if ($oldname == "Empty")
 							{
 								// create new folders
-								mkdir("../templates/".$form["template-name"]);
-								mkdir("../templates/".$form["template-name"]."/img");
-								mkdir("../templates/".$form["template-name"]."/output");
+								mkdir($new_dir);
+								mkdir($new_dir."/img");
+								mkdir($new_dir."/output");
+							}
+							// else if template name has changed
+							else if ($oldname != $template_name)
+							{
+								// checked for template-name conflict happened earlier, so this is safe
+								rename($old_dir, $new_dir);
+							}
+							file_put_contents($new_dir."/input.txt", $json_template, LOCK_EX);
+
+							if ($oldname == "Empty")
+							{
 								// add new template to available list
 								updateActive();
 							}
-							// else if template name has changed
-							else if ($_REQUEST['oldname'] != $form["template-name"])
-							{	
-								// checked for template-name conflict happened earlier, so this is safe
-								rename("../templates/".$_REQUEST['oldname'],"../templates/".$form["template-name"]);
-								
+							else if ($oldname != $template_name)
+							{
 								// check if old name is currently active, if so, change
 								// also need to rename in active.txt
-								$optArr = array('oldName'	=> $_REQUEST['oldname'],
-												'newName'	=> $form['template-name'],
+								$optArr = array('oldName'	=> $oldname,
+												'newName'	=> $template_name,
 												'op'		=> 'saveTemplate');
 								updateActive($optArr);
 							}
-							$inputfile = fopen("../templates/".$form["template-name"]."/input.txt", 'w');
-							fwrite($inputfile, $json_template);
-							fclose($inputfile);
-// 							echo "success";
 							echo $json_template;
 						}
-						// else
+						// else return errors
 						else
 						{
-							$returnstring = '{"images":{';
-							// return errors
+							$images = array();
 							foreach($newfiles as $key => $value)
 							{
-								$returnstring .= '"'.$key.'":"'.implode(",",$value).'",';
+								$images[$key] = implode(",",$value);
 							}
-							$returnstring = substr($returnstring, 0, -1);
-							$returnstring .= '}, "errors":"'.$errors.'"}';
-							echo $returnstring;	
+							echo json_encode(array("images" => $images, "errors" => $errors));
 						}
 					}
 				}
@@ -392,279 +460,44 @@ if( isset($_REQUEST['op']) )
 			}
 			break;
 		case 'deleteTemplate':
-			if( isset($_REQUEST['template']) )
-			{	
-				$folder_dir = "../templates/".$_REQUEST['template'];
-				
-				if( file_exists($folder_dir) )
-				{
-					if(file_exists($folder_dir."/img"))
-					{
-						foreach (scandir($folder_dir."/img") as $item) {
-						    if ($item == '.' || $item == '..') continue;
-						    unlink($folder_dir."/img/".$item);
-						}
-						rmdir($folder_dir."/img");
-					}
-					if(file_exists($folder_dir."/output"))
-					{
-						foreach (scandir($folder_dir."/output") as $item) {
-						    if ($item == '.' || $item == '..') continue;
-						    unlink($folder_dir."/output/".$item);
-						}
-						rmdir($folder_dir."/output");
-					}
-					if(file_exists($folder_dir."/input.txt"))
-					{
-						unlink($folder_dir."/input.txt");
-					}
-					rmdir($folder_dir);
-					
-					$optArr = array('oldName'	=> $_REQUEST['template'],
-									'op'		=> 'deleteTemplate');
-					updateActive($optArr);
-				}
-				else
+			if( isset($_POST['template']) && is_string($_POST['template']) )
+			{
+				$template = $_POST['template'];
+				$folder_dir = template_path($template);
+				$active = read_active();
+
+				if( $folder_dir === false )
 				{
 					echo "Error 5.1: template does not exist";
 				}
-			} 
-			else	
+				else if ($template == "Empty")
+				{
+					echo "Error 5.2: 'Empty' is a reserved Template name and cannot be deleted";
+				}
+				else if (isset($active->active) && $active->active == $template)
+				{
+					echo "Error 5.3: " . $template . " is currently active.  Please make another template active before deleting this template.";
+				}
+				else
+				{
+					delete_template_dir($folder_dir);
+
+					$optArr = array('oldName'	=> $template,
+									'op'		=> 'deleteTemplate');
+					updateActive($optArr);
+				}
+			}
+			else
 			{
 				echo "Error 6.0: template name not specified";
 			}
 			break;
-		case 'getstats':
-			if( isset($_REQUEST['root']) )
-			{
-				if( isset($_REQUEST['output']) )
-				{
-					$completed = scandir($base_dir + $_REQUEST['root'] + $_REQUEST['output']);
-					getstats($completed);
-				}
-				else
-				{
-					echo "Error 4.1: output directory not specified";
-				}
-			} 
-			else	
-			{
-				echo "Error 4.0: root directory not specified";
-			}
+		default:
+			echo "Error -1: unknown operation";
 			break;
-		case 'aggregate':
-			break;
-		case 'writeoutput':
-			if( isset($_REQUEST['template']) )
-			{
-				if( isset($_REQUEST['data']) )
-				{	
-					
-					$folder_dir = "../templates/".$_REQUEST['template']."/output/";
-
-					$sub = isset( $_REQUEST['subject'] ) ? $_REQUEST['subject'] : 'unknown2' ;
-
-					$data = $_REQUEST["data"]; 
-					$datetxt = date('Y-m-d-H-s');
-					$fh = fopen($folder_dir. $_REQUEST['template'] . "-" . $sub . '-' . $datetxt . '.txt', 'w');
-					fwrite($fh, $data);
-					fclose($fh);
-					
-					
-									
-				}
-				else
-				{
-					echo "Error 5.1: data not provided";
-				}
-			} 
-			else	
-			{
-				echo "Error 5.0: template name not specified";
-			}
-			break;
-			
-		case 'writedatabase':
-			if( isset($_REQUEST['template']) )
-				{
-					if( isset($_REQUEST['data']) )
-					{	
-						
-						$dsn = "mysql:host=localhost";
-						try {
-							$pdo = new PDO($dsn, "IATexp555","myIAT");
-						}
-						catch(PDOException $e) { 
-                			echo 'ERROR: ' . $e->getMessage();
-                			break;
-            			}
-            			
-            			$dsn = "mysql:host=localhost";
-						$pdo = new PDO($dsn, "IATexp555","myIAT");
-						$pdo->query("USE `IAT555`;");
-						
-						$sub = isset( $_REQUEST['subject'] ) ? $_REQUEST['subject'] : 'unknown2' ; //Subject Identifier
-						$data = $_REQUEST["data"]; 
-						$tempname = isset( $_REQUEST['template'] ) ? $_REQUEST['template'] : 'Templateunknown' ; //Science etc
-						$catindex = $_POST['catindex'];
-						$category = $_POST['category'];
-						$datai = $_POST['datai'];
-						$dataj = $_POST['dataj'];
-						$errors = $_POST['errors'];
-						$mseconds = $_POST['mseconds'];
-						
-						
-						$sqltemplateid = $pdo->query("select * from Template where TemplateName='$tempname' Order By Templateid Desc Limit 0,1")->fetchColumn(); 
-						$queryinsert = $pdo->prepare("INSERT INTO Result(Templateid,TemplateName,Blocki,Trialj,Category,ItemIndex,Errors,Mseconds,User) VALUES ('$sqltemplateid','$tempname','$datai','$dataj','$category','$catindex','$errors','$mseconds','$sub');");
-						$queryinsert->execute();
-						}
-				}
-				
-			break;
-		case 'checkdb':
-		if( isset($_REQUEST['template']) )
-				{
-						
-						$filepath=realpath(dirname(getcwd()));
-						$filename = $filepath. '/input-text';
-						if (file_exists($filename)) {
-    						echo "The file $filename exists";
-    						//error_log(print_r("The file $filename exists", TRUE));
-						} else 
-							{
-    						echo "The file $filename does not exist";
-    						//error_log(print_r("The file $filename does not exist", TRUE));
-							$dsn = "mysql:host=localhost";
-							try {
-								$pdo = new PDO($dsn, "IATexp555","myIAT");
-								//error_log(print_r("Database exists", TRUE));
-								echo 'success';
-							}
-							catch(PDOException $e) { 
-                				echo 'ERROR';
-                				//error_log(print_r("Database doesn't exist", TRUE));
-            				}
-            			}
-            		
-            		
-            	}
-		
-			break;
-		case 'writeinput':
-			if( isset($_REQUEST['template']) )
-				{
-				if (isset($_REQUEST['form']) )
-					{
-						
-
-            			$dsn = "mysql:host=localhost";
-            			$pdo = new PDO($dsn, "IATexp555","myIAT");
-						$pdo->query("USE `IAT555`;");
-						$templatename=$_REQUEST['template'];
-						$showresult=$_REQUEST['showresult'];
-						$queryinsert = $pdo->prepare("INSERT INTO INSERT INTO Item(Items) VALUES ('$showresult');");
-						$queryinsert->execute();
-						$queryinsert = $pdo->prepare("INSERT INTO Template(TemplateName,ShowResult,IATtype) VALUES ('$templatename','$showresult','2');");
-						$queryinsert->execute();
-						$lasttempid=$pdo->lastInsertId();
-						
-						$catnames = array("A","B","1","2");
-						$form = array();
-						parse_str($_POST['form'], $form);
-						for ($i=1;$i<=4;$i++)
-						{
-							$categoryname=$catnames[$i-1];
-							if(isset($form["tabs".$i."-txt"])) {
-								$istxt="txt";
-								}
-							else {
-								$istxt="img";
-								}
-							$z=$form["tabs".$i."-catlabel-input"];
-							$dl=$form["tabs".$i."-datalabel-input"];
-							
-							$nRows = $pdo->query("select count(*) from Category where Categoryname='$categoryname' and DataLabel='$dl' and ItemType='$istxt' and Label='$z'")->fetchColumn(); 
-							
-							if ($nRows > 0) {
-								$categoryid = $pdo->query("Select Categoryid from Category where Categoryname='$categoryname' and DataLabel='$dl' and ItemType='$istxt' and Label='$z'")->fetchColumn(); 
-								$queryinsert = $pdo->prepare("INSERT INTO Template_has_category(Template_Templateid,Category_Categoryid) VALUES ('$lasttempid','$categoryid');");
-								$queryinsert->execute();
-								
-								for ($j=0; $j<=$form["max-cat".$catnames[$i-1]]; $j++)
-										{
-										if(array_key_exists("cat".$catnames[$i-1].$j."-txt", $form))
-										{
-										$oo=$form["cat".$catnames[$i-1].$j."-txt"];
-										$nitemRows = $pdo->query("select count(*) from Item where Items='$oo'")->fetchColumn();
-										if ($nitemRows > 0) {
-											$itemid = $pdo->query("select Itemid from Item where Items='$oo'")->fetchColumn();
-											$ncatitemRows = $pdo->query("select count(*) from Category_has_item where Category_Categoryid='$categoryid' and Item_itemid='$itemid'")->fetchColumn();
-											if ($ncatitemRows <= 0) {
-												$queryinsert = $pdo->prepare("INSERT INTO Category_has_Item(Category_Categoryid,Item_Itemid) VALUES ('$categoryid','$itemid');"); 
-												$queryinsert->execute();}
-											}
-										else {
-											$nitemRows = $pdo->query("select count(*) from Item where Items='$oo'")->fetchColumn();
-											if ($nitemRows <= 0) {
-												$queryinsert = $pdo->prepare("INSERT INTO Item(Items) VALUES ('$oo');");
-												$queryinsert->execute();
-												$itemid = $pdo->query("select Itemid from Item where Items='$oo'")->fetchColumn();
-												$ncatitemRows = $pdo->query("select count(*) from Category_has_item where Category_Categoryid='$categoryid' and Item_itemid='$itemid'")->fetchColumn();
-												if ($ncatitemRows <= 0) {
-													$queryinsert = $pdo->prepare("INSERT INTO Category_has_Item(Category_Categoryid,Item_Itemid) VALUES ('$categoryid','$itemid');"); 
-													$queryinsert->execute(); }
-															}
-												}
-										}
-									}
-								}
-							else
-								{
-								$queryinsert = $pdo->prepare("INSERT INTO Category(CategoryName,DataLabel,ItemType,Label) VALUES ('$categoryname','$dl','$istxt','$z');");
-								$queryinsert->execute();
-								$lastcatid=$pdo->lastInsertId();
-								$queryinsert = $pdo->prepare("INSERT INTO Template_has_category(Template_Templateid,Category_Categoryid) VALUES ('$lasttempid','$lastcatid');");
-								$queryinsert->execute();
-								for ($j=0; $j<=$form["max-cat".$catnames[$i-1]]; $j++)
-										{
-										if(array_key_exists("cat".$catnames[$i-1].$j."-txt", $form))
-										{
-										$oo=$form["cat".$catnames[$i-1].$j."-txt"];
-										$nitemRows = $pdo->query("select count(*) from Item where Items='$oo'")->fetchColumn();
-										if ($nitemRows > 0) {
-											$itemid = $pdo->query("select Itemid from Item where Items='$oo'")->fetchColumn();
-											$ncatitemRows = $pdo->query("select count(*) from Category_has_item where Category_Categoryid='$lastcatid' and Item_itemid='$itemid'")->fetchColumn();
-											if ($ncatitemRows <= 0) {
-												$queryinsert = $pdo->prepare("INSERT INTO Category_has_Item(Category_Categoryid,Item_Itemid) VALUES ('$lastcatid','$itemid');"); 
-												$queryinsert->execute();}
-											}
-										else {
-											$nitemRows = $pdo->query("select count(*) from Item where Items='$oo'")->fetchColumn();
-											if ($nitemRows <= 0) {
-											$queryinsert = $pdo->prepare("INSERT INTO Item(Items) VALUES ('$oo');");
-											$queryinsert->execute();
-											$itemid = $pdo->query("select Itemid from Item where Items='$oo'")->fetchColumn();
-											$ncatitemRows = $pdo->query("select count(*) from Category_has_item where Category_Categoryid='$lastcatid' and Item_itemid='$itemid'")->fetchColumn();
-											if ($ncatitemRows <= 0) {
-												$queryinsert = $pdo->prepare("INSERT INTO Category_has_Item(Category_Categoryid,Item_Itemid) VALUES ('$lastcatid','$itemid');"); 
-												$queryinsert->execute(); }
-															}
-										}
-									}
-							  }
-						
-							
-						}
-						
-					}
-						
-				}
-			}
-				
-			break;
-	}	
-} 
-else 
+	}
+}
+else
 {
 	echo "Error -1: no operation specified";
 }

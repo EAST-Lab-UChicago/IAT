@@ -1,2 +1,4 @@
 .DS_Store
 **/*output*/
+# created by setup.sh
+core/config.php

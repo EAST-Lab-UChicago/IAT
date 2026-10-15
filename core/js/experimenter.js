@@ -3,6 +3,15 @@ var catlistnames = ["catA","catB","cat1","cat2"];
 var catfullnames = ["Category A","Category B","Category 1","Category 2"];
 var arr = [];
 
+// Template viewer item for a template name (names may contain characters
+// that are not safe inside a selector)
+function findTemplateItem(templateId)
+{
+	return $(".template-item").filter(function() {
+		return String($(this).data("templateid")) === String(templateId);
+	});
+}
+
 
 $.fn.hookToInput = function(selector)
 {
@@ -14,12 +23,12 @@ $.fn.hookToInput = function(selector)
 	this.each(function(i)
 	{
 		var $this = $(this);
-		var assocInput = $($.isFunction(selector)	? selector($this) 
+		var assocInput = $(typeof selector === "function"	? selector($this) 
 													: selector.get(i));
 		
 		assocInput.keyup(function()
 		{
-			$this.html(assocInput.val() || "[Untitled]");
+			$this.text(assocInput.val() || "[Untitled]");
 		});
 	});
 }
@@ -144,7 +153,7 @@ var FileMgr = {
 	 */
 	setForceCache: function(fileArr)
 	{
-		if($.isArray(fileArr))
+		if(Array.isArray(fileArr))
 		{
 			this.defCache = this.defCache.concat(fileArr);
 		}
@@ -156,6 +165,13 @@ var FileMgr = {
 
 };
 
+
+// Toggle-button group for radio inputs, without the jQuery UI >= 1.12 radio icon
+function radioButtonset(group)
+{
+	group.find(":radio").checkboxradio({ icon: false });
+	return group.buttonset();
+}
 
 // Begin application logic...
 
@@ -211,7 +227,7 @@ function readyTemplates(input)
 	{
 		// Automatically load active template (if any) or #create-new 
 		if(input.active != "Empty") {
-			$(".template-item[data-templateid='" + input.active + "']").trigger("click");
+			findTemplateItem(input.active).trigger("click");
 		}
 		else
 		{
@@ -232,7 +248,7 @@ function readyTemplates(input)
 		
 		// Attach unload event handler that stores unsaved template data changes
 		// to prompt user with on return visit
-		$(window).bind("beforeunload",storeUnsavedChanges)
+		$(window).on("beforeunload",storeUnsavedChanges)
 		
 		// Check for unsaved data from previous visit
 		showUnsavedChangesFromPrevious();
@@ -269,7 +285,7 @@ function showUnsavedChangesFromPrevious()
 	{
 		/*$("#alert-window").html("Do you want to recover unsaved changes to " + templateId + "?");
 		$("#alert-window").dialog({
-			title: "<h3>Unsaved Changes:" + templateId + "</h3>",
+			title: "Unsaved Changes:" + templateId,
 			modal: true,
 			buttons: {
 				Yes: function()
@@ -309,9 +325,12 @@ function renderTemplateViewerItem(templateId)
 	// errors resulting from selecting .template-item elements
 	// with illegal characters in ID attribute
 	
-	$(".active-selector").append("<div id='" + templateId + 
-		"' data-templateid='" + templateId + 
-		"' data-ischanged='false' class='template-item user-template template-button'><span class=\"delete-item ui-icon ui-icon-trash\" title=\"Delete\"></span><span class='template-item-label'>" + templateId + "</span></div>");
+	var item = $("<div data-ischanged='false' class='template-item user-template template-button'></div>")
+		.attr("id", templateId)
+		.attr("data-templateid", templateId)
+		.append("<span class=\"delete-item ui-icon ui-icon-trash\" title=\"Delete\"></span>")
+		.append($("<span class='template-item-label'></span>").text(templateId));
+	$(".active-selector").append(item);
 }
 
 function showTemplates(input)
@@ -349,24 +368,24 @@ function showTemplates(input)
 	}
 	
 	// Re-attach .template-selected class to current template
-	var currTemplateObj = $(".template-item[data-templateid='" + currTemplateId + "']"); 
+	var currTemplateObj = findTemplateItem(currTemplateId); 
 	if(currTemplateObj.length > 0)
 	{
 		currTemplateObj.addClass("template-selected");
 	}
 	
 	// Attach event handler for changing templates
-	$(".template-item").unbind("click").click(selectTemplate);
+	$(".template-item").off("click").click(selectTemplate);
 }
 
 
 function verifyDelete(templateId) 
 {
-	if($(".exp-header-active").html() == templateId)
+	if($(".exp-header-active").text() == templateId)
 	{
-		$( "#alert-window" ).html(templateId+" is currently active.  Please make another template active before deleting this template.");
+		$( "#alert-window" ).text(templateId+" is currently active.  Please make another template active before deleting this template.");
 	    $( "#alert-window" ).dialog({
-			title: "<h3>Template Currently Active</h3>",
+			title: "Template Currently Active",
 	        modal: true,
 	        buttons: {
 	            Ok: function() {
@@ -377,9 +396,9 @@ function verifyDelete(templateId)
 	}
 	else
 	{
-		$( "#alert-window" ).html("<div style='color:red'> Are you sure you want to delete template '"+templateId+"'?  This will delete all associated files, including existing data!!</div>");
+		$( "#alert-window" ).empty().append($("<div style='color:red'></div>").text(" Are you sure you want to delete template '"+templateId+"'?  This will delete all associated files, including existing data!!"));
 	    $( "#alert-window" ).dialog({
-			title: "<h3>Confirm Delete</h3>",
+			title: "Confirm Delete",
 	        modal: true,
 	        buttons: {
 	            Delete: function() {
@@ -425,9 +444,9 @@ function selectTemplate(e)
 		
 		if(currTemplateObj.hasClass("template-unsaved"))
 		{	
-			$("#alert-window").html("Do you want to save changes to \"<b>" + currTemplate +"</b>\"?")
+			$("#alert-window").empty().append("Do you want to save changes to \"", $("<b></b>").text(currTemplate), "\"?")
 			.dialog({
-				title: "<h3>Unsaved Changes</h3>",
+				title: "Unsaved Changes",
 				modal: true,
 				close: clearUnsavedTemplate,
 				buttons: {
@@ -445,7 +464,7 @@ function selectTemplate(e)
 					},
 					Discard: function()
 					{
-						currTemplateObj.find(".template-item-label").html(currTemplateObj.data("templateid")); // Restore original template name
+						currTemplateObj.find(".template-item-label").text(currTemplateObj.data("templateid")); // Restore original template name
 						changeTemplate({
 							templateObj: $this,
 							isReloadActive: false
@@ -513,60 +532,60 @@ function renderTemplateForm(data)
 	$("#category-selector").tabs();
 	
 	// Enable buttons to select between 2-cat and 1-cat IAT
-	$( "#IAT-type" ).buttonset();
+	radioButtonset($( "#IAT-type" ));
 	// set initial value from template
 	if(templates[templateId].IATtype == "two")
 	{
-		$("#IAT-standard").attr("checked",true);
+		$("#IAT-standard").prop("checked", true);
 		$("#IAT-type").buttonset('refresh');
 	}
 	else
 	{
-		$("#IAT-single").attr("checked",true);
+		$("#IAT-single").prop("checked", true);
 		$("#IAT-type").buttonset('refresh');
 	}
 	// Change on click
 	$( "#IAT-type :radio" ).click(function(e) {
-		$( "#IAT-type :radio" ).attr("checked",false);
-		$(this).attr("checked",true);
+		$( "#IAT-type :radio" ).prop("checked", false);
+		$(this).prop("checked", true);
 	});
 	// Hide IAT type until IAT is ready for it
 	$( "#IAT-type").hide();
 	
 	// Enable buttons for showing results at end or not
-	$( "#show-results" ).buttonset();
+	radioButtonset($( "#show-results" ));
 	if(templates[templateId].showResult == "show")
 	{
-		$("#show").attr("checked",true);
+		$("#show").prop("checked", true);
 		$("#show-results").buttonset('refresh');
 	}
 	else
 	{
-		$("#noshow").attr("checked",true);
+		$("#noshow").prop("checked", true);
 		$("#show-results").buttonset('refresh');
 	}
 	// Change on click
 	$( "#show-results :radio" ).click(function(e) {
-		$( "#show-results :radio" ).attr("checked",false);
-		$(this).attr("checked",true);
+		$( "#show-results :radio" ).prop("checked", false);
+		$(this).prop("checked", true);
 	});
 	
 	// Enable buttons for saving to file or database
-// 	$( "#save-results" ).buttonset();
+// 	radioButtonset($( "#save-results" ));
 // 	if(templates[templateId].saveResult == "file")
 // 	{
-// 		$("#file").attr("checked",true);
+// 		$("#file").prop("checked", true);
 // 		$("#save-results").buttonset('refresh');
 // 	}
 // 	else
 // 	{
-// 		$("#database").attr("checked",true);
+// 		$("#database").prop("checked", true);
 // 		$("#save-results").buttonset('refresh');
 // 	}
 // 	// Change on click
 // 	$( "#save-results :radio" ).click(function(e) {
-// 		$( "#save-results :radio" ).attr("checked",false);
-// 		$(this).attr("checked",true);
+// 		$( "#save-results :radio" ).prop("checked", false);
+// 		$(this).prop("checked", true);
 // 	});
 	
 	var categoryTabs = $("#category-list a");
@@ -578,26 +597,26 @@ function renderTemplateForm(data)
 		arr.push(catlistnames[j-1]);
 		
 		// Update category tab with name
-		$(categoryTabs.get(j - 1)).html(templates[templateId][catname].label);
+		$(categoryTabs.get(j - 1)).text(templates[templateId][catname].label);
 		
 		// Set up Category Tab
-		$( "#"+tabname+"-toi-selector" ).buttonset();
+		radioButtonset($( "#"+tabname+"-toi-selector" ));
 		
 		// Change from img to text on click
 		$( "#"+tabname+"-toi-selector :radio" ).click(function(e) {
 			idx = parseInt($(this).attr("id").slice(-5,-4));
 			tabname = "tabs" + idx;
 			catname = catlistnames[idx-1];
-			$( "#"+tabname+"-toi-selector :radio" ).attr("checked",false);
+			$( "#"+tabname+"-toi-selector :radio" ).prop("checked", false);
 			
 			if($(this).attr("id").slice(-3) == "txt")
 			{
-				$(this).attr("checked",true);
+				$(this).prop("checked", true);
 				$(".img-item-"+catname).hide();
 			}
 			else
 			{
-				$(this).attr("checked",true);
+				$(this).prop("checked", true);
 				$(".img-item-"+catname).show();
 				updateImages(idx);
 			}
@@ -612,24 +631,13 @@ function renderTemplateForm(data)
 		
 		// Show options for each tab
 		for (var i=0; i<templates[templateId][catname].items.length; i++) {
-			itemstring = "<div class='catitem'>";
-				// delete button
-				itemstring += "<span class=\"delete-item ui-icon ui-icon-close\" onclick='deleteItem(\"" + catname + i + "\")'></span>";
-				// preview	
-				if(templates[templateId][catname].itemtype == "txt")
-				{
-					itemstring += "<img src='core/no-image.jpg' class='cat-item-img img-item-"+catname+"' id='" + catname + i + "-img'>";
-				}
-				else
-				{
-					itemstring += "<img src='templates/"+templateId+"/img/"+templates[templateId][catname].items[i];
-					itemstring += "' class='cat-item-img img-item-"+catname+"' id='" + catname + i + "-img'>";
-				}
-				// input for filename
-				itemstring += "<input type='text' id='" + catname + i + "-txt' name='" + catname + i + "-txt' value='" 
-				itemstring += templates[templateId][catname].items[i] + "'>";
-			itemstring += "</div>";
-			$("#"+tabname+"-catitems").append(itemstring);
+			var itemValue = templates[templateId][catname].items[i];
+			var imgSrc = "core/no-image.jpg";
+			if(templates[templateId][catname].itemtype != "txt")
+			{
+				imgSrc = "templates/"+encodeURIComponent(templateId)+"/img/"+encodeURIComponent(itemValue);
+			}
+			$("#"+tabname+"-catitems").append(buildCatItem(catname, i, imgSrc, itemValue));
 		}
 		itemstring = "<input type='hidden' id='max-"+catname+"' name='max-"+catname+"' value="+i+">";
 		$("#"+tabname+"-catitems").append(itemstring);
@@ -645,14 +653,14 @@ function renderTemplateForm(data)
 		if(templates[templateId][catname].itemtype == "txt")
 		{
 			// Set text / image selection
-			$("#"+tabname+"-txt").attr('checked', "checked");
+			$("#"+tabname+"-txt").prop("checked", true);
 			$("#"+tabname+"-toi-selector").buttonset('refresh');
 			$(".img-item-"+catname).hide();
 		}
 		else
 		{
 			// Set text / image selection
-			$("#"+tabname+"-img").attr('checked', "checked");
+			$("#"+tabname+"-img").prop("checked", true);
 			$("#"+tabname+"-toi-selector").buttonset('refresh');
 			$(".img-item-"+catname).show();
 		}
@@ -670,10 +678,10 @@ function attachTemplateFormEventHandlers()
 	$("input[type=button]").button();
 	
 	// Listen for changes to template to update templates object
-	$("#template-form input").unbind("change").on("change",updateTemplateState);
+	$("#template-form input").off("change").on("change",updateTemplateState);
 	
 	// Event handler for save icon in template viewer
-	$("#save-template").unbind("click").click(function() {
+	$("#save-template").off("click").click(function() {
 		saveTemplate(repaintTemplates,showSaveError)
 	});
 	
@@ -725,7 +733,7 @@ function repaintTemplates()
 	/*$("#alert-window").html("The template '"+templateName+"' has been successfully saved.");
 	$(function() {
         $( "#alert-window" ).dialog({
-			title: "<h3>Template saved</h3>",
+			title: "Template saved",
             modal: true,
             buttons: {
                 Ok: function() {
@@ -763,7 +771,7 @@ function showSaveError(data)
 	}
 	$(function() {
         $( "#alert-window" ).dialog({
-			title: "<h3>Problems with template</h3>",
+			title: "Problems with template",
             modal: true,
             buttons: {
                 Ok: function() {
@@ -785,8 +793,7 @@ function updateTemplateState(e)
 		.addClass("template-unsaved");
 		
 		// Subtle hint: add save icon to template viewer item
-		var baseHtml = currTemplateObj.html();
-		currTemplateObj.html(baseHtml + "<span class=\"ui-icon ui-icon-disk save-item\" title=\"Save\"></span>");
+		currTemplateObj.append("<span class=\"ui-icon ui-icon-disk save-item\" title=\"Save\"></span>");
 	}
 }
 
@@ -804,17 +811,11 @@ function addItem(catnum)
 	catname = catlistnames[catnum-1];
 	var lastitem = $("#max-"+catname).prev();
 	var lasttext = lastitem.children("input:text").attr("id");
-	var idx = parseInt(lasttext.slice(-5,-4)) + 1;
+	// ids look like "<catname><index>-txt"
+	var idx = lasttext ? parseInt(lasttext.slice(catname.length, -4), 10) + 1 : 0;
+	if (isNaN(idx)) { idx = parseInt($("#max-"+catname).val(), 10) + 1; }
 	
-	itemstring = "<div class='catitem'>";
-		// delete button
-		itemstring += "<span class=\"delete-item ui-icon ui-icon-close\" onclick='deleteItem(\"" + catname + idx + "\")'></span>";
-		// preview
-		itemstring += "<img src='core/no-image.jpg' class='cat-item-img img-item-"+catname+"' id='" + catname + idx + "-img'>";	
-		// input for filename
-		itemstring += "<input type='text' id='" + catname + idx + "-txt' name='" + catname + idx + "-txt' + value='Input Filename'>";
-	itemstring += "</div>";
-	$("#max-"+catname).before(itemstring);
+	$("#max-"+catname).before(buildCatItem(catname, idx, "core/no-image.jpg", "Input Filename"));
 	// check currently selected option
 	if($("#"+tabname+"-toi-selector :radio:checked").attr("id") == tabname+"-txt")
 	{
@@ -874,6 +875,27 @@ function updateImages(catidx)
 	});
 }
 
+// One item row in a category tab: delete button, image preview, text input
+function buildCatItem(catname, idx, imgSrc, value)
+{
+	var catitem = $("<div class='catitem'></div>");
+	// delete button
+	$("<span class=\"delete-item ui-icon ui-icon-close\"></span>")
+		.click(function() { deleteItem(catname + idx); })
+		.appendTo(catitem);
+	// preview
+	$("<img class='cat-item-img'>")
+		.addClass("img-item-"+catname)
+		.attr({ "src": imgSrc, "id": catname + idx + "-img" })
+		.appendTo(catitem);
+	// input for filename
+	$("<input type='text'>")
+		.attr({ "id": catname + idx + "-txt", "name": catname + idx + "-txt" })
+		.val(value)
+		.appendTo(catitem);
+	return catitem;
+}
+
 function deleteItem(idx)
 {
 	var catitem = $("#"+idx+"-txt").parent();
@@ -889,10 +911,10 @@ function setActive()
 		function(data) {
 			if(data == "success")
 			{
-				$(".exp-header-active").html($(".template-selected").attr("id"));
-				$( "#alert-window" ).html("The template '"+$(".template-selected").attr("id")+"' is now active.");
+				$(".exp-header-active").text($(".template-selected").attr("id"));
+				$( "#alert-window" ).text("The template '"+$(".template-selected").attr("id")+"' is now active.");
 		        $( "#alert-window" ).dialog({
-					title: "<h3>Active Template Updated</h3>",
+					title: "Active Template Updated",
 		            modal: true,
 		            buttons: {
 		                Ok: function() {
@@ -926,7 +948,13 @@ function saveTemplate(successCallback, errorCallback)
 	FileMgr.post(FileMgr.getFileMgrPath(), 
 		{ "op": "saveTemplate", "template": templateId, "oldname": oldName, "form": formString}, 
 		function(saveData) {	
-			returnedData = JSON.parse(saveData);
+			if (saveData.slice(0,5) == "Error")
+			{
+				alert(saveData); // Should call errorCallback as well? (Probably)
+				return;
+			}
+			try { returnedData = JSON.parse(saveData); }
+			catch (err) { errorCallback(saveData); return; }
 			if (returnedData.name == templateId)
 			{
 				templates[templateId] = returnedData;
@@ -950,29 +978,11 @@ function saveTemplate(successCallback, errorCallback)
 // 					successCallback(saveData);
 // 				});
 			}
-			else if (saveData.slice(0,5) == "Error")
-			{
-				alert(saveData); // Should call errorCallback as well? (Probably)
-			}
 			else
 			{
 				errorCallback(saveData);
 			}
 	});
-
-
-	var showresult;
-	showresult=templates[templateId].showResult;
-	FileMgr.post(FileMgr.getFileMgrPath(), 
-	{ "op": "checkdb", "template": templateId, "form": formString, "showresult": showresult }, 
-	function(checkdb) {
-	if(checkdb == "success")
-			{
-				FileMgr.post(FileMgr.getFileMgrPath(), 
-				{ "op": "writeinput", "template": templateId, "form": formString, "showresult": showresult });
-			}
-		});
-	
 }
 
 
@@ -992,7 +1002,7 @@ function loadCreateForm() {
 
 function loadActiveStats(input)
 {	
-	$(".exp-header-active").html(input.active);
+	$(".exp-header-active").text(input.active);
 	
 	// Get completed output	
 	// $.getJSON("core/fileManager.php",
