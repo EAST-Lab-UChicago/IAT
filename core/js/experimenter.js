@@ -23,7 +23,7 @@ $.fn.hookToInput = function(selector)
 	this.each(function(i)
 	{
 		var $this = $(this);
-		var assocInput = $($.isFunction(selector)	? selector($this) 
+		var assocInput = $(typeof selector === "function"	? selector($this) 
 													: selector.get(i));
 		
 		assocInput.keyup(function()
@@ -153,7 +153,7 @@ var FileMgr = {
 	 */
 	setForceCache: function(fileArr)
 	{
-		if($.isArray(fileArr))
+		if(Array.isArray(fileArr))
 		{
 			this.defCache = this.defCache.concat(fileArr);
 		}
@@ -165,6 +165,13 @@ var FileMgr = {
 
 };
 
+
+// Toggle-button group for radio inputs, without the jQuery UI >= 1.12 radio icon
+function radioButtonset(group)
+{
+	group.find(":radio").checkboxradio({ icon: false });
+	return group.buttonset();
+}
 
 // Begin application logic...
 
@@ -241,7 +248,7 @@ function readyTemplates(input)
 		
 		// Attach unload event handler that stores unsaved template data changes
 		// to prompt user with on return visit
-		$(window).bind("beforeunload",storeUnsavedChanges)
+		$(window).on("beforeunload",storeUnsavedChanges)
 		
 		// Check for unsaved data from previous visit
 		showUnsavedChangesFromPrevious();
@@ -278,7 +285,7 @@ function showUnsavedChangesFromPrevious()
 	{
 		/*$("#alert-window").html("Do you want to recover unsaved changes to " + templateId + "?");
 		$("#alert-window").dialog({
-			title: "<h3>Unsaved Changes:" + templateId + "</h3>",
+			title: "Unsaved Changes:" + templateId,
 			modal: true,
 			buttons: {
 				Yes: function()
@@ -368,7 +375,7 @@ function showTemplates(input)
 	}
 	
 	// Attach event handler for changing templates
-	$(".template-item").unbind("click").click(selectTemplate);
+	$(".template-item").off("click").click(selectTemplate);
 }
 
 
@@ -378,7 +385,7 @@ function verifyDelete(templateId)
 	{
 		$( "#alert-window" ).text(templateId+" is currently active.  Please make another template active before deleting this template.");
 	    $( "#alert-window" ).dialog({
-			title: "<h3>Template Currently Active</h3>",
+			title: "Template Currently Active",
 	        modal: true,
 	        buttons: {
 	            Ok: function() {
@@ -391,7 +398,7 @@ function verifyDelete(templateId)
 	{
 		$( "#alert-window" ).empty().append($("<div style='color:red'></div>").text(" Are you sure you want to delete template '"+templateId+"'?  This will delete all associated files, including existing data!!"));
 	    $( "#alert-window" ).dialog({
-			title: "<h3>Confirm Delete</h3>",
+			title: "Confirm Delete",
 	        modal: true,
 	        buttons: {
 	            Delete: function() {
@@ -439,7 +446,7 @@ function selectTemplate(e)
 		{	
 			$("#alert-window").empty().append("Do you want to save changes to \"", $("<b></b>").text(currTemplate), "\"?")
 			.dialog({
-				title: "<h3>Unsaved Changes</h3>",
+				title: "Unsaved Changes",
 				modal: true,
 				close: clearUnsavedTemplate,
 				buttons: {
@@ -525,60 +532,60 @@ function renderTemplateForm(data)
 	$("#category-selector").tabs();
 	
 	// Enable buttons to select between 2-cat and 1-cat IAT
-	$( "#IAT-type" ).buttonset();
+	radioButtonset($( "#IAT-type" ));
 	// set initial value from template
 	if(templates[templateId].IATtype == "two")
 	{
-		$("#IAT-standard").attr("checked",true);
+		$("#IAT-standard").prop("checked", true);
 		$("#IAT-type").buttonset('refresh');
 	}
 	else
 	{
-		$("#IAT-single").attr("checked",true);
+		$("#IAT-single").prop("checked", true);
 		$("#IAT-type").buttonset('refresh');
 	}
 	// Change on click
 	$( "#IAT-type :radio" ).click(function(e) {
-		$( "#IAT-type :radio" ).attr("checked",false);
-		$(this).attr("checked",true);
+		$( "#IAT-type :radio" ).prop("checked", false);
+		$(this).prop("checked", true);
 	});
 	// Hide IAT type until IAT is ready for it
 	$( "#IAT-type").hide();
 	
 	// Enable buttons for showing results at end or not
-	$( "#show-results" ).buttonset();
+	radioButtonset($( "#show-results" ));
 	if(templates[templateId].showResult == "show")
 	{
-		$("#show").attr("checked",true);
+		$("#show").prop("checked", true);
 		$("#show-results").buttonset('refresh');
 	}
 	else
 	{
-		$("#noshow").attr("checked",true);
+		$("#noshow").prop("checked", true);
 		$("#show-results").buttonset('refresh');
 	}
 	// Change on click
 	$( "#show-results :radio" ).click(function(e) {
-		$( "#show-results :radio" ).attr("checked",false);
-		$(this).attr("checked",true);
+		$( "#show-results :radio" ).prop("checked", false);
+		$(this).prop("checked", true);
 	});
 	
 	// Enable buttons for saving to file or database
-// 	$( "#save-results" ).buttonset();
+// 	radioButtonset($( "#save-results" ));
 // 	if(templates[templateId].saveResult == "file")
 // 	{
-// 		$("#file").attr("checked",true);
+// 		$("#file").prop("checked", true);
 // 		$("#save-results").buttonset('refresh');
 // 	}
 // 	else
 // 	{
-// 		$("#database").attr("checked",true);
+// 		$("#database").prop("checked", true);
 // 		$("#save-results").buttonset('refresh');
 // 	}
 // 	// Change on click
 // 	$( "#save-results :radio" ).click(function(e) {
-// 		$( "#save-results :radio" ).attr("checked",false);
-// 		$(this).attr("checked",true);
+// 		$( "#save-results :radio" ).prop("checked", false);
+// 		$(this).prop("checked", true);
 // 	});
 	
 	var categoryTabs = $("#category-list a");
@@ -593,23 +600,23 @@ function renderTemplateForm(data)
 		$(categoryTabs.get(j - 1)).text(templates[templateId][catname].label);
 		
 		// Set up Category Tab
-		$( "#"+tabname+"-toi-selector" ).buttonset();
+		radioButtonset($( "#"+tabname+"-toi-selector" ));
 		
 		// Change from img to text on click
 		$( "#"+tabname+"-toi-selector :radio" ).click(function(e) {
 			idx = parseInt($(this).attr("id").slice(-5,-4));
 			tabname = "tabs" + idx;
 			catname = catlistnames[idx-1];
-			$( "#"+tabname+"-toi-selector :radio" ).attr("checked",false);
+			$( "#"+tabname+"-toi-selector :radio" ).prop("checked", false);
 			
 			if($(this).attr("id").slice(-3) == "txt")
 			{
-				$(this).attr("checked",true);
+				$(this).prop("checked", true);
 				$(".img-item-"+catname).hide();
 			}
 			else
 			{
-				$(this).attr("checked",true);
+				$(this).prop("checked", true);
 				$(".img-item-"+catname).show();
 				updateImages(idx);
 			}
@@ -646,14 +653,14 @@ function renderTemplateForm(data)
 		if(templates[templateId][catname].itemtype == "txt")
 		{
 			// Set text / image selection
-			$("#"+tabname+"-txt").attr('checked', "checked");
+			$("#"+tabname+"-txt").prop("checked", true);
 			$("#"+tabname+"-toi-selector").buttonset('refresh');
 			$(".img-item-"+catname).hide();
 		}
 		else
 		{
 			// Set text / image selection
-			$("#"+tabname+"-img").attr('checked', "checked");
+			$("#"+tabname+"-img").prop("checked", true);
 			$("#"+tabname+"-toi-selector").buttonset('refresh');
 			$(".img-item-"+catname).show();
 		}
@@ -671,10 +678,10 @@ function attachTemplateFormEventHandlers()
 	$("input[type=button]").button();
 	
 	// Listen for changes to template to update templates object
-	$("#template-form input").unbind("change").on("change",updateTemplateState);
+	$("#template-form input").off("change").on("change",updateTemplateState);
 	
 	// Event handler for save icon in template viewer
-	$("#save-template").unbind("click").click(function() {
+	$("#save-template").off("click").click(function() {
 		saveTemplate(repaintTemplates,showSaveError)
 	});
 	
@@ -726,7 +733,7 @@ function repaintTemplates()
 	/*$("#alert-window").html("The template '"+templateName+"' has been successfully saved.");
 	$(function() {
         $( "#alert-window" ).dialog({
-			title: "<h3>Template saved</h3>",
+			title: "Template saved",
             modal: true,
             buttons: {
                 Ok: function() {
@@ -764,7 +771,7 @@ function showSaveError(data)
 	}
 	$(function() {
         $( "#alert-window" ).dialog({
-			title: "<h3>Problems with template</h3>",
+			title: "Problems with template",
             modal: true,
             buttons: {
                 Ok: function() {
@@ -907,7 +914,7 @@ function setActive()
 				$(".exp-header-active").text($(".template-selected").attr("id"));
 				$( "#alert-window" ).text("The template '"+$(".template-selected").attr("id")+"' is now active.");
 		        $( "#alert-window" ).dialog({
-					title: "<h3>Active Template Updated</h3>",
+					title: "Active Template Updated",
 		            modal: true,
 		            buttons: {
 		                Ok: function() {
